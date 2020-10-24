@@ -5,8 +5,10 @@ const app = express();
 const fs = require('fs');
 const cors = require('cors');
 const https = require('https');
+const http = require('http');
 const url = require('url');
 const port = 3030;
+const portHttp = 3031;
 
 let allData = [];
 let latestData = {};
@@ -27,8 +29,14 @@ https.createServer({
     cert: fs.readFileSync('ssl/server.cert')
 }, app)
     .listen(port, () => {
-        console.log(`Example app listening at http://localhost:${port}`)
+        console.log(`HTTPS app listening at https://localhost:${port}`)
     });
+
+http.createServer(app)
+    .listen(portHttp, () => {
+        console.log(`Http app listening at http://localhost:${portHttp}`)
+    });
+
 
 
 app.get('/', (req, res) => {
