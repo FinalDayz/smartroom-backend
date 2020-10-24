@@ -1,31 +1,43 @@
+require('dotenv').config();
+
 const express = require('express');
 const app = express();
 const fs = require('fs');
 const cors = require('cors');
 const https = require('https');
+const url = require('url');
 const port = 3030;
 
 let allData = [];
 let latestData = {};
+let status = {
+    heater: false,
+    color: {
+        r: 0,
+        g: 0,
+        b: 0,
+    },
+    buzzer: [],
+};
 
 app.use(cors());
 
 https.createServer({
-    key: fs.readFileSync('server.key'),
-    cert: fs.readFileSync('server.cert')
+    key: fs.readFileSync('ssl/server.key'),
+    cert: fs.readFileSync('ssl/server.cert')
 }, app)
     .listen(port, () => {
         console.log(`Example app listening at http://localhost:${port}`)
-    })
+    });
 
 
 app.get('/', (req, res) => {
     res.send(JSON.stringify(latestData));
 });
-
-app.get('/all/', (req, res) => {
-    res.send(JSON.stringify(allData));
-});
+//
+// app.get('/all/', (req, res) => {
+//     res.send(JSON.stringify(allData));
+// });
 
 const verify = (req, res, success) => {
     let body = '';
@@ -33,31 +45,50 @@ const verify = (req, res, success) => {
         body += chunk;
     });
     req.on('end', () => {
-        try{
+        try {
             body = JSON.parse(body);
-        } catch(err) {
+        } catch (err) {
             res.sendStatus(415);
             return;
         }
-        if(body.key !== '36ebaba344136b2d1f6352624894f111d9e76758') {
+        if (body.key !== process.env.LOGIN_KEY) {
             res.sendStatus(401);
             res.end();
             return;
         }
-        body.key = '';
+        delete body.key;
         success(body);
     });
 };
 
+const verifyGet = (req, res, success) => {
+    const queryObject = url.parse(req.url,true).query;
+    if (queryObject.key !== process.env.LOGIN_KEY) {
+        res.sendStatus(401);
+        res.end();
+        return;
+    }
+    delete queryObject.key;
+    success(queryObject);
+};
+
 const ok = (res) => {
-    res.write("OK");
+    res.write(JSON.stringify(status));
     res.end();
 };
 
+app.get("/status", function (req, res) {
+    verifyGet(req, res, params => {
+        ok(res);
+    });
+});
+
 app.post('/reading/', function (req, res) {
     verify(req, res, (data) => {
-        console.log(data);
-        latestData = data;
+        latestData = {
+            ...latestData,
+            ...data
+        };
         allData.push(data);
         ok(res);
     });
@@ -70,3 +101,24 @@ app.post('/delete', (req, res) => {
         ok(res);
     });
 });
+
+
+app.post('/set/heater', function (req, res) {
+    verify(req, res, (data) => {
+        status.heater = data.heater;
+        ok(res);
+    });
+});
+app.post('/set/color', function (req, res) {
+    verify(req, res, (data) => {
+        status.color = data.color;
+        ok(res);
+    });
+});
+app.post('/set/buzzer', function (req, res) {
+    verify(req, res, (data) => {
+        status.buzzer = data.buzzer;
+        ok(res);
+    });
+});
+
