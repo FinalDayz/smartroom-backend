@@ -10,9 +10,11 @@ const url = require('url');
 const port = 3030;
 const portHttp = 3031;
 const frontendPort = 3080;
+const mysql = require('mysql');
 
 let allData = [];
 let latestData = {};
+let lastInsert = {};
 let status = {
     heater: false,
     color: {
@@ -22,6 +24,22 @@ let status = {
     },
     buzzer: [],
 };
+
+const connection = mysql.createConnection({
+    host: process.env.MYSQL_URL,
+    user: process.env.MYSQL_USERNAME,
+    password: process.env.MYSQL_PASSWORD,
+    database: 'SmartRoom'
+});
+
+connection.connect(function (err) {
+    if (err) {
+        console.error('error connecting MYSQL: ' + err.stack);
+        process.exit(1);
+    }
+
+    console.log('connected as id ' + connection.threadId);
+});
 
 frontEnd = express();
 http.createServer(frontEnd)
@@ -47,7 +65,6 @@ http.createServer(app)
     .listen(portHttp, () => {
         console.log(`Http app listening at http://localhost:${portHttp}`)
     });
-
 
 
 app.get('/', (req, res) => {
@@ -81,7 +98,7 @@ const verify = (req, res, success) => {
 };
 
 const verifyGet = (req, res, success) => {
-    const queryObject = url.parse(req.url,true).query;
+    const queryObject = url.parse(req.url, true).query;
     if (queryObject.key !== process.env.LOGIN_KEY) {
         res.sendStatus(401);
         res.end();
@@ -89,6 +106,29 @@ const verifyGet = (req, res, success) => {
     }
     delete queryObject.key;
     success(queryObject);
+};
+
+const handleReading = (data) => {
+    const temp = data.temperature;
+    let insert = '';
+    if (!isNaN(temp) && (!lastInsert.temperature || Math.abs(temp - lastInsert.temperature) >= 0.5)) {
+        insert += `('temperature', ` + temp + `)`;
+        lastInsert.temperature = temp;
+    }
+
+    const humid = data.humidity;
+    if (!isNaN(humid) && (!lastInsert.humidity || Math.abs(humid - lastInsert.humidity) >= 2)) {
+        insert += (!!insert ? ',' : '') + `('humidity', ` + humid + `)`;
+        lastInsert.humidity = humid;
+    }
+
+    if (insert) {
+        insert = 'INSERT INTO reading (type, value) VALUES ' + insert;
+        connection.query(insert, function (error, results, fields) {
+            if (error) throw error;
+        });
+    }
+
 };
 
 const ok = (res) => {
@@ -108,6 +148,7 @@ app.post('/reading/', function (req, res) {
             ...latestData,
             ...data
         };
+        handleReading(data);
         allData.push(data);
         ok(res);
     });
