@@ -139,7 +139,7 @@ app.post('/reading/', function (req, res) {
     });
 });
 const handleList = function(req, res) {
-    verify(req, res, (data) => {
+    verifyGet(req, res, (data) => {
         const type = req.params.type;
         const from = Date.now() - (req.params.fromMsInPast);
         const to = Date.now() - (req.params.toMsInPast | 0);
