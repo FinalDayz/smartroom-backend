@@ -139,44 +139,49 @@ app.post('/reading/', function (req, res) {
     });
 });
 const handleList = function(req, res) {
-    const type = req.params.type;
-    const from = Date.now() - (req.params.fromMsInPast);
-    const to = Date.now() - (req.params.toMsInPast | 0);
-    const steps = 30;
-    if(!SENSOR_TYPES.includes(type)) {
-        res.sendStatus(415);
-        return;
-    }
+    verify(req, res, (data) => {
+        const type = req.params.type;
+        const from = Date.now() - (req.params.fromMsInPast);
+        const to = Date.now() - (req.params.toMsInPast | 0);
+        const steps = 30;
+        if(!SENSOR_TYPES.includes(type)) {
+            res.sendStatus(415);
+            return;
+        }
 
-    const graphData = new Array(steps);
-    let index = 0;
-    let doneCalls = 0;
-    const doneCallback = () => {
-        res.json(graphData);
-    };
-    for(let timeStamp = from; timeStamp <= to; timeStamp += (to-from)/(steps-1)) {
-        ((index) => {
-            connection.query("SELECT id, time, value " +
-                "FROM `reading` WHERE `type` = '"+type+"' " +
-                "and time <= FROM_UNIXTIME("+timeStamp+"*0.001) " +
-                "order by time desc LIMIT 1",
-                function (error, results, fields) {
-                    let value = null;
-                    if(results.length === 1)
-                        value = results[0].value;
-                    graphData[index] = {
-                        millis: timeStamp,
-                        value: value
-                    };
-                    doneCalls++;
-                    if(doneCalls === steps) {
-                        doneCallback();
-                    }
-                });
-        })(index);
+        const graphData = new Array(steps);
+        let index = 0;
+        let doneCalls = 0;
+        const doneCallback = () => {
+            res.json(graphData);
+        };
+        let stepSize =  (to-from)/steps;
+        let timeStamp = from;
+        for(let step = 0; step < steps; step++) {
+            timeStamp += stepSize;
+            ((index, timeStamp) => {
+                connection.query("SELECT id, time, value " +
+                    "FROM `reading` WHERE `type` = '"+type+"' " +
+                    "and time <= FROM_UNIXTIME("+timeStamp+"*0.001) " +
+                    "order by time desc LIMIT 1",
+                    function (error, results, fields) {
+                        let value = null;
+                        if(results.length === 1)
+                            value = results[0].value;
+                        graphData[index] = {
+                            millis: Math.round(timeStamp),
+                            value: value
+                        };
+                        doneCalls++;
+                        if(doneCalls === steps) {
+                            doneCallback();
+                        }
+                    });
+            })(index, timeStamp);
 
-        index++;
-    }
+            index++;
+        }
+    });
 };
 
 app.get('/get/list/:type/:fromMsInPast/:toMsInPast', handleList);
