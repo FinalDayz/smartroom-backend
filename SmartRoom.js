@@ -6,10 +6,6 @@ const api= require("./api.js");
 const http = require('http');
 const frontendPort = 3080;
 
-
-
-
-
 frontEnd = express();
 http.createServer(frontEnd)
     .listen(frontendPort, () => {

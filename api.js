@@ -24,6 +24,8 @@ let status = {
     },
     buzzer: [],
 };
+let connectionTimer = -1;
+let noConnectionTimeout = 1000 * 60;
 
 
 https.createServer({
@@ -113,6 +115,24 @@ const handleReading = (data) => {
 
 };
 
+function gotConnection() {
+    if(connectionTimer === -1) {
+        connection.query(`INSERT INTO reading (type, value) VALUES ('connection', '1')`,
+            function (error, results, fields) {
+                if (error) throw error;
+            });
+    } else {
+        clearTimeout(connectionTimer);
+    }
+
+    connectionTimer = setTimeout(function() {
+        connection.query(`INSERT INTO reading (type, value) VALUES ('connection', '0')`,
+            function (error, results, fields) {
+                if (error) throw error;
+            });
+        connectionTimer = -1;
+    }, noConnectionTimeout);
+}
 
 const ok = (res) => {
     res.write(JSON.stringify(status));
@@ -122,6 +142,7 @@ const ok = (res) => {
 app.get("/status", function (req, res) {
     verifyGet(req, res, params => {
         ok(res);
+        gotConnection();
     });
 });
 app.get('/', (req, res) => {
@@ -193,6 +214,11 @@ app.post('/set/heater', function (req, res) {
     verify(req, res, (data) => {
         status.heater = data.heater;
         ok(res);
+        const oneOrZero = data.heater ? '1' : '0';
+        connection.query(`INSERT INTO reading (type, value) VALUES ('heater', '`+oneOrZero+`')`,
+            function (error, results, fields) {
+            if (error) throw error;
+        });
     });
 });
 app.post('/set/color', function (req, res) {
