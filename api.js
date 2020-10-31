@@ -125,7 +125,9 @@ app.get("/status", function (req, res) {
     });
 });
 app.get('/', (req, res) => {
-    res.send(JSON.stringify(latestData));
+    verifyGet(req, res, params => {
+        res.send(JSON.stringify(latestData));
+    });
 });
 
 app.post('/reading/', function (req, res) {
