@@ -11,7 +11,7 @@ const express = require('express');
 
 const app = express();
 
-const SENSOR_TYPES = ['temperature', 'humidity'];
+const SENSOR_TYPES = ['temperature', 'humidity', 'heater', 'connection'];
 
 let latestData = {};
 let lastInsert = {};
